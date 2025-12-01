@@ -1,0 +1,13 @@
+{
+  "defaultEnv": "development",
+  "development": {
+    "driver": "pg",
+    "user": { "ENV": "DB_USER" },
+    "password": { "ENV": "DB_PASSWORD" },
+    "host": { "ENV": "DB_HOST", "default": "localhost" },
+    "database": { "ENV": "DB_NAME" },
+    "port": { "ENV": "DB_PORT", "default": 5432 },
+    "schema": "public"
+  }
+}
+
