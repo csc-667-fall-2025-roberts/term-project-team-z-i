@@ -13,6 +13,19 @@
         <div class="logo">🎮 Uno Game</div>
         <div class="user-info">
           <a href="/lobby" class="btn btn-secondary">← Back to Lobby</a>
+          <% if (user && !user.isGuest) { %>
+            <span style="margin-left:0.75rem;">Welcome, <strong><%= user.username %></strong></span>
+            <a href="/auth/logout" class="btn btn-danger" style="margin-left:0.5rem;">Logout</a>
+          <% } else { %>
+            <a href="/auth/login" class="btn btn-secondary" style="margin-left:0.5rem;">Login</a>
+            <a href="/auth/signup" class="btn btn-primary" style="margin-left:0.5rem;">Sign up</a>
+          <% } %>
+          
+          <% if (user && !user.isGuest && user.id === game.created_by) { %>
+            <form action="/games/<%= game.id %>/delete" method="POST" style="display:inline;margin-left:0.5rem;">
+              <button type="submit" class="btn btn-danger">Delete Room</button>
+            </form>
+          <% } %>
         </div>
       </div>
     </div>
@@ -59,14 +72,14 @@
       <div class="player-hand">
         <h3 class="hand-title">Your Hand</h3>
         <div class="hand-cards">
-          <!-- Card placeholders - this will be populated with actual cards later -->
-          <% for (let i = 0; i < 7; i++) { %>
-            <div class="card-placeholder">
-              <div style="text-align: center;">
-                <div style="font-size: 1.5rem;">🃏</div>
-                <div style="font-size: 0.625rem; margin-top: 0.25rem;">Card</div>
+          <% if (hand && hand.length > 0) { %>
+            <% hand.forEach(function(card){ %>
+              <div class="uno-card card-<%= card.color %>">
+                <div class="uno-value"><%= card.value %></div>
               </div>
-            </div>
+            <% }); %>
+          <% } else { %>
+            <p style="color:#6b7280;">No cards in hand.</p>
           <% } %>
         </div>
       </div>
@@ -75,19 +88,31 @@
     <div class="chat-area">
       <h3 class="card-header">Game Chat</h3>
       <div class="chat-messages" id="chatMessages">
-        <div class="chat-message">
-          <strong>System:</strong> Game started! Good luck!
-        </div>
+        <% if (messages && messages.length > 0) { %>
+          <% messages.forEach(function(msg) { %>
+            <div class="chat-message">
+              <strong><%= msg.username %></strong>
+              <span style="color:#6b7280; font-size:0.85rem; margin-left:0.5rem;"><%= msg.created_at %></span>
+              <div><%= msg.message %></div>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <div class="chat-message">
+            <strong>System:</strong> Game started! Good luck!
+          </div>
+        <% } %>
       </div>
-      <div class="chat-input-group">
+      <form action="/games/<%= game.id %>/messages" method="POST" class="chat-input-group">
         <input 
+          name="message"
           type="text" 
           class="chat-input" 
           placeholder="Type a message..."
           id="chatInput"
+          required
         >
-        <button type="button" class="btn btn-primary">Send</button>
-      </div>
+        <button type="submit" class="btn btn-primary">Send</button>
+      </form>
     </div>
   </div>
 </body>

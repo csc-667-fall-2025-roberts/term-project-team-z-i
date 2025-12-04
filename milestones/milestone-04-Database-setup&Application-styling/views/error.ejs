@@ -1,16 +1,79 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Error - Uno Game</title>
+  <title>UNO Error</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body {
+      background: linear-gradient(135deg, #ffeb3b 0%, #f44336 100%);
+      min-height: 100vh;
+      margin: 0;
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .uno-error-box {
+      background: #fff;
+      border: 4px solid #f44336;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+      padding: 2.5em 2em 2em 2em;
+      max-width: 420px;
+      text-align: center;
+      position: relative;
+    }
+    .uno-logo {
+      font-size: 2.5em;
+      font-weight: bold;
+      color: #fff;
+      background: #f44336;
+      border-radius: 50% 50% 50% 50%/60% 60% 40% 40%;
+      padding: 0.2em 0.7em;
+      margin-bottom: 0.5em;
+      display: inline-block;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+      letter-spacing: 0.1em;
+      text-shadow: 1px 2px 0 #222;
+    }
+    .uno-error-title {
+      color: #f44336;
+      font-size: 2em;
+      margin: 0.2em 0 0.5em 0;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+    .uno-error-message {
+      color: #333;
+      font-size: 1.15em;
+      margin-bottom: 1.5em;
+    }
+    .uno-home-btn {
+      display: inline-block;
+      background: #ffeb3b;
+      color: #222;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7em 1.5em;
+      font-size: 1em;
+      text-decoration: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: background 0.2s, color 0.2s;
+      cursor: pointer;
+    }
+    .uno-home-btn:hover {
+      background: #f44336;
+      color: #fff;
+    }
+  </style>
 </head>
 <body>
-  <div class="error-container">
-    <div class="error-code">⚠️</div>
-    <h1 class="error-message"><%= error %></h1>
-    <a href="/lobby" class="btn btn-primary">Return to Lobby</a>
+  <div class="uno-error-box">
+    <div class="uno-logo">UNO</div>
+    <div class="uno-error-title">Oops! Something went wrong</div>
+    <div class="uno-error-message"><%= message || error || "An unexpected error occurred." %></div>
+    <a href="/" class="uno-home-btn">Back to Lobby</a>
   </div>
 </body>
 </html>

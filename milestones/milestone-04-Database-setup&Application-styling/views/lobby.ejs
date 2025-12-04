@@ -12,8 +12,13 @@
       <div class="header-content">
         <div class="logo">🎮 Uno Game</div>
         <div class="user-info">
-          <span>Welcome, <strong><%= user.username %></strong></span>
-          <a href="/auth/logout" class="btn btn-danger">Logout</a>
+          <% if (user && !user.isGuest) { %>
+            <span>Welcome, <strong><%= user.username %></strong></span>
+            <a href="/auth/logout" class="btn btn-danger">Logout</a>
+          <% } else { %>
+            <a href="/auth/login" class="btn btn-secondary">Login</a>
+            <a href="/auth/signup" class="btn btn-primary">Sign up</a>
+          <% } %>
         </div>
       </div>
     </div>
@@ -83,19 +88,31 @@
     <div class="chat-area">
       <h3 class="card-header">Lobby Chat</h3>
       <div class="chat-messages" id="chatMessages">
-        <div class="chat-message">
-          <strong>System:</strong> Welcome to the lobby! Start chatting with other players.
-        </div>
+        <% if (messages && messages.length > 0) { %>
+          <% messages.forEach(function(msg) { %>
+            <div class="chat-message">
+              <strong><%= msg.username %></strong>
+              <span style="color:#6b7280; font-size:0.85rem; margin-left:0.5rem;"><%= msg.created_at %></span>
+              <div><%= msg.message %></div>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <div class="chat-message">
+            <strong>System:</strong> Welcome to the lobby! Start chatting with other players.
+          </div>
+        <% } %>
       </div>
-      <div class="chat-input-group">
+      <form action="/messages" method="POST" class="chat-input-group">
         <input 
+          name="message"
           type="text" 
           class="chat-input" 
           placeholder="Type a message..."
           id="chatInput"
+          required
         >
-        <button type="button" class="btn btn-primary">Send</button>
-      </div>
+        <button type="submit" class="btn btn-primary">Send</button>
+      </form>
     </div>
   </div>
 </body>
