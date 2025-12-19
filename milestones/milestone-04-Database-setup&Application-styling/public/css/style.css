@@ -325,7 +325,7 @@ body {
   width: 120px;
   height: 168px;
   background-image: url("unoCards.png");
-  background-size: 1200% 800%;
+  background-size: 1200% 600%;
   border-radius: 0.7rem;
   display: flex;
   align-items: center;
