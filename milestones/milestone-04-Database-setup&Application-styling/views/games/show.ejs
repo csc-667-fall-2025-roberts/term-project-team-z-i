@@ -75,8 +75,7 @@
         <div class="hand-cards">
           <% if (hand && hand.length > 0) { %>
             <% hand.forEach(function(card){ %>
-              <div class="uno-card card-<%= card.color %>">
-                <div class="uno-value"><%= card.value %></div>
+              <div class="uno-card card-<%= card.color %>-<%= card.value %>">
               </div>
             <% }); %>
           <% } else { %>
