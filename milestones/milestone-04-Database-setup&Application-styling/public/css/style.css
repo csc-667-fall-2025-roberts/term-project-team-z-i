@@ -324,8 +324,9 @@ body {
 .draw-pile {
   width: 120px;
   height: 168px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 0.5rem;
+  background-image: url("unoCards.png");
+  background-size: 1200% 800%;
+  border-radius: 0.7rem;
   display: flex;
   align-items: center;
   justify-content: center;
