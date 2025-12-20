@@ -153,7 +153,7 @@
               <div class="discard-pile">
                 <% if (game.gameState.discard_pile && game.gameState.discard_pile.length > 0) { %>
                   <% const topCard = game.gameState.discard_pile[game.gameState.discard_pile.length - 1]; %>
-                  <div class="uno-card card-<%= topCard.color %>" style="width:90px; height:126px;">
+                  <div class="uno-card card-<%= topCard.color %>-<%= topCard.value %>" style="width:80px; height:112px;">
                     <div class="uno-value" style="font-size:1.3rem;"><%= getCardSymbol(topCard.value) %></div>
                   </div>
                 <% } else { %>
@@ -165,7 +165,6 @@
               </div>
               <div class="draw-pile" id="drawCardBtn">
                 <div style="text-align: center;">
-                  <div style="font-size: 1.8rem; margin-bottom: 0.3rem;">🎴</div>
                   <div style="font-size: 0.7rem;">DRAW</div>
                 </div>
               </div>
@@ -177,8 +176,10 @@
               <div class="hand-cards" style="justify-content: center; gap: 0.5rem;">
                 <% if (hand && hand.length > 0) { %>
                   <% hand.forEach(function(card, index){ %>
-                    <div class="uno-card card-<%= card.color %>-<%= card.value %>" data-card-index="<%= index %>" style="width: 65px; height: 91px;">
+                    <div data-card-index="<%= index %>" style="width: 65px; height: 91px;">
+                      <div class="uno-card card-<%= card.color %>-<%= card.value %>" style="width:80px; height:112px;"></div>
                       <div class="uno-value" style="font-size: 1.1rem;"><%= getCardSymbol(card.value) %></div>
+                      
                     </div>
                   <% }); %>
                 <% } else { %>

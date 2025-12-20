@@ -15,6 +15,19 @@
   transition: transform 0.15s ease;
 }
 
+.uno-card:hover {
+  transform: translateY(-8px) scale(1.05);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.uno-card:active {
+  transform: translateY(-4px) scale(1.02);
+}
+
+.uno-card.playable {
+  animation: pulse 2s infinite;
+}
+
 .card-wild { width: 80px;
   height: 112px;
   background-position: -72px 0px; }
@@ -75,7 +88,7 @@
 .card-yellow-0 { width: 80px;
   height: 112px;
   background-position: -649px -103px; }
-.card-yellow-draw_2 { width: 80px;
+.card-yellow-draw2 { width: 80px;
   height: 112px;
   background-position: -720px -103px; }
 .card-yellow-skip { width: 80px;
@@ -115,7 +128,7 @@
 .card-red-0 { width: 80px;
   height: 112px;
   background-position: -720px -207px; }
-.card-red-draw_2 { width: 80px;
+.card-red-draw2 { width: 80px;
   height: 112px;
   background-position: -793px -207px; }
 
@@ -156,7 +169,7 @@
   height: 112px;
   background-position: -793px -312px; }
 
-.card-blue-draw_2 { width: 80px;
+.card-blue-draw2 { width: 80px;
   height: 112px;
   background-position: 0px -416px; }
 .card-blue-skip { width: 80px;
@@ -196,7 +209,7 @@
 .card-green-0 { width: 80px;
   height: 112px;
   background-position: 0px -520px; }
-.card-green-draw_2 { width: 80px;
+.card-green-draw2 { width: 80px;
   height: 112px;
   background-position: -72px -416px; }
 .card-green-skip { width: 80px;

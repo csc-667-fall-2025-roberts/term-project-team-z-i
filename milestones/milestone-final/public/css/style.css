@@ -435,50 +435,41 @@ body {
 }
 
 /* UNO Cards */
-.uno-card {
-  width: 80px;
-  height: 112px;
-  border-radius: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 1.25rem;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  transition: all 0.2s ease;
-  cursor: pointer;
-  position: relative;
-}
-
-.uno-card:hover {
-  transform: translateY(-8px) scale(1.05);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-}
-
-.uno-card:active {
-  transform: translateY(-4px) scale(1.02);
-}
-
-.uno-card.playable {
-  animation: pulse 2s infinite;
-}
 
 .card-red {
-  background: linear-gradient(135deg, #f43f5e, #dc2626);
+  background-image: url("unoCards.png");
+  background-size: 1200% 600%;
+  border-radius: 0.7rem;
+  width: 80px;
+  height: 112px;
+  background-position: -215px 0px; 
 }
 
 .card-yellow {
-  background: linear-gradient(135deg, #facc15, #f59e0b);
+  background-image: url("unoCards.png");
+  background-size: 1200% 600%;
+  border-radius: 0.7rem;
+  width: 80px;
+  height: 112px;
+  background-position: -143px 0px; 
 }
 
 .card-green {
-  background: linear-gradient(135deg, #10b981, #047857);
+  background-image: url("unoCards.png");
+  background-size: 1200% 600%;
+  border-radius: 0.7rem;
+  width: 80px;
+  height: 112px;
+  background-position: -143px 0px;
 }
 
 .card-blue {
-  background: linear-gradient(135deg, #60a5fa, #2563eb);
+  background-image: url("unoCards.png");
+  background-size: 1200% 600%;
+  border-radius: 0.7rem;
+  width: 80px;
+  height: 112px;
+  background-position: -288px 0px;
 }
 
 .card-wild {
