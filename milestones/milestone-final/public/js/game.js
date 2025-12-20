@@ -9,6 +9,11 @@ let userId = null;
 let currentHand = [];
 let isMyTurn = false;
 
+// Turn timer state
+let turnTimerInterval = null;
+let turnTimeRemaining = 10;
+const TURN_DURATION = 10; // seconds
+
 // Convert card value to display symbol
 function getCardSymbol(value) {
   const symbols = {
@@ -43,9 +48,70 @@ function initGame(gId, uId, hand) {
       isMyTurn = (parseInt(currentPlayerId) === userId);
       console.log('Initialized turn state:', { isMyTurn, currentPlayerId, userId });
     }
+    
+    // Check if game is active and start timer
+    const gameState = gameData.getAttribute('data-game-state');
+    if (gameState === 'active') {
+      startVisualTimer();
+    }
   }
   
   console.log('Game initialized:', { gameId, userId, handSize: currentHand.length, isMyTurn });
+}
+
+// Turn Timer Functions
+function startVisualTimer() {
+  // Clear any existing timer
+  stopVisualTimer();
+  
+  // Show timer display
+  const timerDisplay = document.getElementById('turnTimerDisplay');
+  if (timerDisplay) {
+    timerDisplay.style.display = 'block';
+  }
+  
+  // Reset timer
+  turnTimeRemaining = TURN_DURATION;
+  updateTimerDisplay();
+  
+  // Start countdown
+  turnTimerInterval = setInterval(() => {
+    turnTimeRemaining -= 0.1; // Update every 100ms for smooth animation
+    
+    if (turnTimeRemaining <= 0) {
+      turnTimeRemaining = 0;
+      stopVisualTimer();
+    }
+    
+    updateTimerDisplay();
+  }, 100);
+}
+
+function stopVisualTimer() {
+  if (turnTimerInterval) {
+    clearInterval(turnTimerInterval);
+    turnTimerInterval = null;
+  }
+  
+  // Hide timer display
+  const timerDisplay = document.getElementById('turnTimerDisplay');
+  if (timerDisplay) {
+    timerDisplay.style.display = 'none';
+  }
+}
+
+function updateTimerDisplay() {
+  const secondsEl = document.getElementById('turnTimerSeconds');
+  const barEl = document.getElementById('turnTimerBar');
+  
+  if (secondsEl) {
+    secondsEl.textContent = Math.ceil(turnTimeRemaining);
+  }
+  
+  if (barEl) {
+    const percentage = (turnTimeRemaining / TURN_DURATION) * 100;
+    barEl.style.width = percentage + '%';
+  }
 }
 
 // Note: Start game button handler is in the inline script in show.ejs
@@ -75,6 +141,9 @@ socket.on('game_started', (data) => {
   
   // Show game started message
   addSystemMessage('Game has started! Good luck!');
+  
+  // Start the visual timer for the current player
+  startVisualTimer();
   
   // Reload page to get updated game state
   setTimeout(() => {
@@ -129,6 +198,16 @@ function playCard(cardIndex) {
     return;
   }
   
+  console.log('Attempting to play card:', {
+    cardIndex,
+    card,
+    cardColor: card.color,
+    cardValue: card.value,
+    colorType: typeof card.color,
+    valueType: typeof card.value,
+    currentHand: currentHand.map((c, i) => ({ index: i, color: c.color, value: c.value }))
+  });
+  
   // Check if it's a wild card - if so, show color picker
   if (card.value === 'wild' || card.value === 'wild_draw4') {
     showColorPicker(card, cardIndex);
@@ -166,7 +245,14 @@ socket.on('card_played', (data) => {
   // Update UI
   if (data.userId === userId) {
     // Remove card from hand
-    const cardIndex = currentHand.findIndex(c => c.color === data.card.color && c.value === data.card.value);
+    // For wild cards, only match by value since color changes
+    let cardIndex;
+    if (data.card.value === 'wild' || data.card.value === 'wild_draw4') {
+      cardIndex = currentHand.findIndex(c => c.value === data.card.value);
+    } else {
+      cardIndex = currentHand.findIndex(c => c.color === data.card.color && c.value === data.card.value);
+    }
+    
     if (cardIndex !== -1) {
       currentHand.splice(cardIndex, 1);
       updateHandDisplay();
@@ -179,10 +265,11 @@ socket.on('card_played', (data) => {
   // Update current player
   updateCurrentPlayer(data.nextPlayer);
   
-  // Update player card count
-  if (data.userId !== userId) {
-    updatePlayerCardCount(data.userId, data.cardsLeft);
-  }
+  // Restart visual timer for next player
+  startVisualTimer();
+  
+  // Update player card count for all players (including the one who played)
+  updatePlayerCardCount(data.userId, data.cardsLeft);
   
   // Show notification with special action
   const username = getPlayerUsername(data.userId);
@@ -193,13 +280,6 @@ socket.on('card_played', (data) => {
   }
   
   showNotification(message, 'info');
-  
-  // Reload if you were affected by Draw 2/4
-  if (data.nextPlayer === userId && (data.card.value === 'draw2' || data.card.value === 'wild_draw4')) {
-    setTimeout(() => {
-      window.location.reload();
-    }, 2000);
-  }
 });
 
 // Draw card functionality
@@ -225,14 +305,70 @@ socket.on('card_drawn', (data) => {
 
 // Listen for player drew card event
 socket.on('player_drew_card', (data) => {
+  const username = getPlayerUsername(data.userId);
+  
   if (data.userId !== userId) {
-    const username = getPlayerUsername(data.userId);
     showNotification(`${username} drew a card`, 'info');
-    
-    // Update their card count
-    if (data.cardsLeft) {
-      updatePlayerCardCount(data.userId, data.cardsLeft);
-    }
+  }
+  
+  // Update card count for all players (including yourself)
+  if (data.cardsLeft) {
+    updatePlayerCardCount(data.userId, data.cardsLeft);
+  }
+});
+
+// Listen for player skipped event (Draw 2 / Draw 4)
+socket.on('player_skipped', (data) => {
+  console.log('Player skipped:', data);
+  
+  // Update card count for the player who drew cards
+  if (data.cardsLeft) {
+    updatePlayerCardCount(data.userId, data.cardsLeft);
+  }
+  
+  // Show notification
+  const username = getPlayerUsername(data.userId);
+  showNotification(`${username} drew ${data.cardsDrawn} cards and was skipped!`, 'warning');
+  
+  // If you were the one who drew cards, reload to see them
+  if (data.userId === userId) {
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+  }
+});
+
+// Listen for turn changed event
+socket.on('turn_changed', (data) => {
+  console.log('Turn changed:', data);
+  
+  // Update current player
+  updateCurrentPlayer(data.currentPlayer);
+  
+  // Restart visual timer for new player
+  startVisualTimer();
+});
+
+// Listen for player turn timeout event
+socket.on('player_turn_timeout', (data) => {
+  console.log('Player turn timeout:', data);
+  
+  // Don't stop the timer - it will restart for the next player
+  // The server will send a turn_changed event which will restart the timer
+  
+  // Update card count
+  if (data.cardsLeft) {
+    updatePlayerCardCount(data.userId, data.cardsLeft);
+  }
+  
+  // Show notification
+  showNotification(`⏱️ ${data.username}'s turn timed out - drew a card and was skipped`, 'warning');
+  
+  // If it was your turn that timed out, reload to get the new card in your hand
+  if (data.userId === userId) {
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
   }
 });
 
@@ -240,14 +376,21 @@ socket.on('player_drew_card', (data) => {
 socket.on('game_finished', (data) => {
   console.log('Game finished:', data);
   
+  // Stop the visual timer
+  stopVisualTimer();
+  
   const username = data.winnerName || getPlayerUsername(data.winner);
   showNotification(`🎉 ${username} wins the game! 🎉`, 'success');
   
-  // Show game over overlay
+  // Show game over overlay with options
   setTimeout(() => {
-    if (confirm(`${username} has won the game! Return to lobby?`)) {
+    const message = `🎉 ${username} has won the game! 🎉\n\nWhat would you like to do?`;
+    const playAgain = confirm(message + '\n\nClick OK to return to lobby and start a new game, or Cancel to stay here.');
+    
+    if (playAgain) {
       window.location.href = '/lobby';
     }
+    // If they click Cancel, they stay on the game page to view the final state
   }, 2000);
 });
 
@@ -314,6 +457,12 @@ function updateHandDisplay() {
     cardDiv.onclick = () => playCard(index);
     handContainer.appendChild(cardDiv);
   });
+  
+  // Update card count in "Your Hand" section
+  const cardCountEl = document.getElementById('cardCount');
+  if (cardCountEl) {
+    cardCountEl.textContent = currentHand.length;
+  }
 }
 
 function updateDiscardPile(card) {

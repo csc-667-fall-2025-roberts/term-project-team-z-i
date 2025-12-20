@@ -12,6 +12,10 @@ const httpServer = createServer(app);
 const io = new Server(httpServer);
 const PORT = process.env.PORT || 3000;
 
+// Store active turn timers: { gameId: timeoutId }
+const turnTimers = {};
+const TURN_TIMEOUT = 10000; // 10 seconds
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -167,6 +171,7 @@ app.get('/lobby', async (req, res) => {
       FROM games g
       LEFT JOIN game_players gp ON g.id = gp.game_id
       LEFT JOIN users u ON g.created_by = u.id
+      WHERE g.state != 'finished'
       GROUP BY g.id, u.username
       ORDER BY g.created_at DESC
     `);
@@ -633,7 +638,13 @@ io.on('connection', (socket) => {
       }
       
       // Set up game state
-      const topCard = deck.shift();
+      // Find first non-wild card for starting card
+      let topCardIndex = deck.findIndex(card => card.value !== 'wild' && card.value !== 'wild_draw4');
+      if (topCardIndex === -1) {
+        // If all remaining cards are wild (unlikely), just use first card
+        topCardIndex = 0;
+      }
+      const topCard = deck.splice(topCardIndex, 1)[0];
       const currentPlayer = playerIds[0];
       
       await db.query(
@@ -652,6 +663,9 @@ io.on('connection', (socket) => {
         message: 'Game has started!',
         currentPlayer
       });
+      
+      // Start turn timer for the first player
+      startTurnTimer(gameId, currentPlayer, io);
       
       // Check if first player is AI
       const firstPlayerResult = await db.query(
@@ -715,14 +729,65 @@ io.on('connection', (socket) => {
       
       // Remove card from hand
       // For wild cards, match by value only since color was changed by player
-      let cardIndex;
+      let cardIndex = -1;
+      
       if (card.value === 'wild' || card.value === 'wild_draw4') {
+        // Wild cards: match by value only
         cardIndex = hand.findIndex(c => c.value === card.value);
+        console.log('Wild card matching:', { cardValue: card.value, foundIndex: cardIndex });
       } else {
+        // Regular cards: try multiple matching strategies
+        console.log('Attempting to match card:', { 
+          cardToPlay: card, 
+          handCards: hand.map((c, i) => ({ index: i, color: c.color, value: c.value }))
+        });
+        
+        // Strategy 1: Exact match
         cardIndex = hand.findIndex(c => c.color === card.color && c.value === card.value);
+        if (cardIndex !== -1) console.log('Found with exact match at index:', cardIndex);
+        
+        // Strategy 2: Case-insensitive match
+        if (cardIndex === -1) {
+          cardIndex = hand.findIndex(c => 
+            String(c.color).toLowerCase() === String(card.color).toLowerCase() && 
+            String(c.value).toLowerCase() === String(card.value).toLowerCase()
+          );
+          if (cardIndex !== -1) console.log('Found with case-insensitive match at index:', cardIndex);
+        }
+        
+        // Strategy 3: Match by value only (for any card with matching value and color)
+        if (cardIndex === -1) {
+          cardIndex = hand.findIndex(c => {
+            const colorMatch = String(c.color).trim() === String(card.color).trim();
+            const valueMatch = String(c.value).trim() === String(card.value).trim();
+            return colorMatch && valueMatch;
+          });
+          if (cardIndex !== -1) console.log('Found with trimmed match at index:', cardIndex);
+        }
+        
+        // Strategy 4: For special cards, just match any card with same value and color (very lenient)
+        if (cardIndex === -1) {
+          cardIndex = hand.findIndex(c => {
+            return c.value == card.value && c.color == card.color;  // Use == for type coercion
+          });
+          if (cardIndex !== -1) console.log('Found with loose equality at index:', cardIndex);
+        }
       }
       
       if (cardIndex === -1) {
+        console.error('CARD NOT FOUND - Detailed debug:', { 
+          cardToPlay: card,
+          cardToPlayType: { color: typeof card.color, value: typeof card.value },
+          cardToPlayString: JSON.stringify(card),
+          hand: hand.map((c, i) => ({ 
+            index: i, 
+            color: c.color, 
+            value: c.value, 
+            types: { color: typeof c.color, value: typeof c.value },
+            str: JSON.stringify(c)
+          })),
+          userId 
+        });
         socket.emit('error', { message: 'Card not in hand!' });
         return;
       }
@@ -738,23 +803,25 @@ io.on('connection', (socket) => {
       // Update discard pile
       const newDiscardPile = [...gameState.discard_pile, card];
       
-      // Get next player
-      const playersResult = await db.query(
-        `SELECT user_id FROM game_players WHERE game_id = $1 ORDER BY joined_at`,
-        [gameId]
-      );
-      const playerIds = playersResult.rows.map(r => r.user_id);
-      let nextPlayer = getNextPlayer(playerIds, userId, gameState.direction, card);
-      
-      // Handle special cards
+      // Handle reverse card first (before calculating next player)
       let newDirection = gameState.direction;
       if (card.value === 'reverse') {
         newDirection = gameState.direction === 'clockwise' ? 'counterclockwise' : 'clockwise';
       }
       
+      // Get next player (using the new direction if reversed)
+      const playersResult = await db.query(
+        `SELECT user_id FROM game_players WHERE game_id = $1 ORDER BY joined_at`,
+        [gameId]
+      );
+      const playerIds = playersResult.rows.map(r => r.user_id);
+      let nextPlayer = getNextPlayer(playerIds, userId, newDirection, card);
+      
       // Handle Draw 2 and Wild Draw 4
       if (card.value === 'draw2' || card.value === 'wild_draw4') {
         const drawCount = card.value === 'draw2' ? 2 : 4;
+        
+        console.log(`Player will draw ${drawCount} cards from ${card.value}`);
         
         // Get next player's hand
         const nextHandResult = await db.query(
@@ -765,6 +832,8 @@ io.on('connection', (socket) => {
         if (nextHandResult.rows.length > 0) {
           let nextHand = nextHandResult.rows[0].cards;
           let currentDrawPile = gameState.draw_pile;
+          
+          console.log(`Next player hand before draw: ${nextHand.length} cards`);
           
           // Draw cards for next player
           for (let i = 0; i < drawCount; i++) {
@@ -782,11 +851,15 @@ io.on('connection', (socket) => {
             }
           }
           
+          console.log(`Next player hand after draw: ${nextHand.length} cards`);
+          
           // Update next player's hand
           await db.query(
             `UPDATE hands SET cards = $1, updated_at = NOW() WHERE game_id = $2 AND user_id = $3`,
             [JSON.stringify(nextHand), gameId, nextPlayer]
           );
+          
+          console.log(`Updated database with ${nextHand.length} cards for player ${nextPlayer}`);
           
           // Update draw pile
           gameState.draw_pile = currentDrawPile;
@@ -805,6 +878,7 @@ io.on('connection', (socket) => {
           io.to(`game_${gameId}`).emit('player_skipped', {
             userId: nextPlayer,
             cardsDrawn: drawCount,
+            cardsLeft: nextHand.length,
             message: `Player drew ${drawCount} cards and was skipped`
           });
           
@@ -832,6 +906,12 @@ io.on('connection', (socket) => {
           winnerName: winnerName,
           message: 'Game Over!'
         });
+        
+        // Clear turn timer for finished game
+        clearTurnTimer(gameId);
+        
+        // Auto-delete the game after 30 seconds
+        deleteFinishedGame(gameId, 30000);
       } else {
         // Broadcast move to all players
         const cardAction = card.value === 'draw2' ? 'Draw 2' : 
@@ -846,6 +926,10 @@ io.on('connection', (socket) => {
           cardsLeft: hand.length,
           specialAction: cardAction
         });
+        
+        // Clear current turn timer and start new one for next player
+        clearTurnTimer(gameId);
+        startTurnTimer(gameId, nextPlayer, io);
         
         // Check if next player is AI
         const nextPlayerResult = await db.query(
@@ -924,23 +1008,48 @@ io.on('connection', (socket) => {
       );
       
       socket.emit('card_drawn', { card: drawnCard });
-      socket.to(`game_${gameId}`).emit('player_drew_card', { 
+      io.to(`game_${gameId}`).emit('player_drew_card', { 
         userId,
         cardsLeft: hand.length 
       });
       
-      // Check if next player is AI (after drawing, turn advances)
-      const nextPlayerResult = await db.query(
-        `SELECT gs.current_player, u.username 
-         FROM game_state gs 
-         JOIN users u ON gs.current_player = u.id 
-         WHERE gs.game_id = $1 AND u.username LIKE 'AI_Player_%'`,
+      // Advance turn to next player after drawing
+      const playersResult = await db.query(
+        `SELECT user_id FROM game_players WHERE game_id = $1 ORDER BY joined_at`,
         [gameId]
+      );
+      const playerIds = playersResult.rows.map(r => r.user_id);
+      const currentIndex = playerIds.indexOf(userId);
+      let nextIndex;
+      if (gameState.direction === 'clockwise') {
+        nextIndex = (currentIndex + 1) % playerIds.length;
+      } else {
+        nextIndex = (currentIndex - 1 + playerIds.length) % playerIds.length;
+      }
+      const nextPlayer = playerIds[nextIndex];
+      
+      await db.query(
+        `UPDATE game_state SET current_player = $1, updated_at = NOW() WHERE game_id = $2`,
+        [nextPlayer, gameId]
+      );
+      
+      // Notify clients about turn change
+      io.to(`game_${gameId}`).emit('turn_changed', { 
+        currentPlayer: nextPlayer 
+      });
+      
+      // Clear current turn timer and start new one for next player
+      clearTurnTimer(gameId);
+      startTurnTimer(gameId, nextPlayer, io);
+      
+      // Check if next player is AI
+      const nextPlayerResult = await db.query(
+        `SELECT username FROM users WHERE id = $1 AND username LIKE 'AI_Player_%'`,
+        [nextPlayer]
       );
       
       if (nextPlayerResult.rows.length > 0) {
-        const aiPlayerId = nextPlayerResult.rows[0].current_player;
-        setTimeout(() => makeAIMove(gameId, aiPlayerId, io), 2000);
+        setTimeout(() => makeAIMove(gameId, nextPlayer, io), 2000);
       }
     } catch (error) {
       console.error('Error drawing card:', error);
@@ -1088,10 +1197,182 @@ function getNextPlayer(playerIds, currentPlayerId, direction, playedCard) {
   return playerIds[nextIndex];
 }
 
+// Delete a finished game after a short delay
+async function deleteFinishedGame(gameId, delay = 30000) {
+  try {
+    // Wait for the specified delay (default 30 seconds) to give players time to see the results
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    console.log(`Auto-deleting finished game ${gameId}...`);
+    
+    // Delete all related data
+    await db.query('DELETE FROM hands WHERE game_id = $1', [gameId]);
+    await db.query('DELETE FROM game_state WHERE game_id = $1', [gameId]);
+    await db.query('DELETE FROM messages WHERE game_id = $1', [gameId]);
+    await db.query('DELETE FROM game_players WHERE game_id = $1', [gameId]);
+    await db.query('DELETE FROM games WHERE id = $1', [gameId]);
+    
+    console.log(`Successfully deleted finished game ${gameId}`);
+  } catch (error) {
+    console.error(`Error deleting finished game ${gameId}:`, error);
+  }
+}
+
+// Turn Timer Functions
+function startTurnTimer(gameId, playerId, io) {
+  // Clear any existing timer for this game
+  clearTurnTimer(gameId);
+  
+  // Don't set timer for AI players
+  if (!playerId) return;
+  
+  // Check if player is AI
+  db.query('SELECT username FROM users WHERE id = $1', [playerId])
+    .then(result => {
+      if (result.rows.length > 0 && result.rows[0].username.startsWith('AI_Player_')) {
+        return; // Don't set timer for AI
+      }
+      
+      // Set timeout for human players
+      turnTimers[gameId] = setTimeout(() => {
+        console.log(`Turn timeout for game ${gameId}, player ${playerId}`);
+        handleTurnTimeout(gameId, playerId, io);
+      }, TURN_TIMEOUT);
+      
+      console.log(`Turn timer started for game ${gameId}, player ${playerId}`);
+    })
+    .catch(err => console.error('Error checking player type:', err));
+}
+
+function clearTurnTimer(gameId) {
+  if (turnTimers[gameId]) {
+    clearTimeout(turnTimers[gameId]);
+    delete turnTimers[gameId];
+    console.log(`Turn timer cleared for game ${gameId}`);
+  }
+}
+
+async function handleTurnTimeout(gameId, playerId, io) {
+  try {
+    console.log(`Handling turn timeout for game ${gameId}, player ${playerId}`);
+    
+    // Get game state
+    const stateResult = await db.query(
+      `SELECT * FROM game_state WHERE game_id = $1`,
+      [gameId]
+    );
+    
+    if (stateResult.rows.length === 0) {
+      console.log('Game state not found, skipping timeout');
+      return;
+    }
+    const gameState = stateResult.rows[0];
+    
+    // Verify it's still this player's turn
+    if (gameState.current_player !== playerId) {
+      console.log(`Player ${playerId} is no longer current player (current: ${gameState.current_player}), skipping timeout`);
+      return;
+    }
+    
+    // Get player info
+    const playerResult = await db.query(`SELECT username FROM users WHERE id = $1`, [playerId]);
+    const playerName = playerResult.rows[0]?.username || 'Unknown';
+    
+    console.log(`Forcing timeout for ${playerName} (${playerId})`);
+    
+    // Force player to draw a card
+    let drawPile = gameState.draw_pile;
+    
+    if (drawPile.length === 0) {
+      const discardPile = gameState.discard_pile;
+      const topCard = discardPile.pop();
+      drawPile = discardPile;
+      shuffleDeck(drawPile);
+      
+      await db.query(
+        `UPDATE game_state SET discard_pile = $1, draw_pile = $2 WHERE game_id = $3`,
+        [JSON.stringify([topCard]), JSON.stringify(drawPile), gameId]
+      );
+    }
+    
+    const drawnCard = drawPile.shift();
+    
+    // Update draw pile
+    await db.query(
+      `UPDATE game_state SET draw_pile = $1, updated_at = NOW() WHERE game_id = $2`,
+      [JSON.stringify(drawPile), gameId]
+    );
+    
+    // Add card to player's hand
+    const handResult = await db.query(
+      `SELECT cards FROM hands WHERE game_id = $1 AND user_id = $2`,
+      [gameId, playerId]
+    );
+    
+    let hand = handResult.rows[0].cards;
+    hand.push(drawnCard);
+    
+    await db.query(
+      `UPDATE hands SET cards = $1, updated_at = NOW() WHERE game_id = $2 AND user_id = $3`,
+      [JSON.stringify(hand), gameId, playerId]
+    );
+    
+    // Advance turn to next player
+    const playersResult = await db.query(
+      `SELECT user_id FROM game_players WHERE game_id = $1 ORDER BY joined_at`,
+      [gameId]
+    );
+    const playerIds = playersResult.rows.map(r => r.user_id);
+    const currentIndex = playerIds.indexOf(playerId);
+    let nextIndex;
+    if (gameState.direction === 'clockwise') {
+      nextIndex = (currentIndex + 1) % playerIds.length;
+    } else {
+      nextIndex = (currentIndex - 1 + playerIds.length) % playerIds.length;
+    }
+    const nextPlayer = playerIds[nextIndex];
+    
+    await db.query(
+      `UPDATE game_state SET current_player = $1, updated_at = NOW() WHERE game_id = $2`,
+      [nextPlayer, gameId]
+    );
+    
+    // Notify all players
+    io.to(`game_${gameId}`).emit('player_turn_timeout', {
+      userId: playerId,
+      username: playerName,
+      cardsLeft: hand.length,
+      message: `${playerName}'s turn timed out - drew a card and turn skipped`
+    });
+    
+    io.to(`game_${gameId}`).emit('turn_changed', { 
+      currentPlayer: nextPlayer 
+    });
+    
+    // Start timer for next player
+    startTurnTimer(gameId, nextPlayer, io);
+    
+    // Check if next player is AI
+    const nextPlayerResult = await db.query(
+      `SELECT username FROM users WHERE id = $1 AND username LIKE 'AI_Player_%'`,
+      [nextPlayer]
+    );
+    
+    if (nextPlayerResult.rows.length > 0) {
+      setTimeout(() => makeAIMove(gameId, nextPlayer, io), 2000);
+    }
+  } catch (error) {
+    console.error('Error handling turn timeout:', error);
+  }
+}
+
 // AI Player Logic
 async function makeAIMove(gameId, aiUserId, io) {
   try {
     console.log(`AI Player ${aiUserId} is thinking...`);
+    
+    // Clear the timer for this AI player since they're making a move
+    clearTurnTimer(gameId);
     
     // Small delay to simulate thinking
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -1165,19 +1446,19 @@ async function makeAIMove(gameId, aiUserId, io) {
       // Update discard pile
       const newDiscardPile = [...gameState.discard_pile, cardToPlay];
       
-      // Get players
+      // Handle reverse card first (before calculating next player)
+      let newDirection = gameState.direction;
+      if (cardToPlay.value === 'reverse') {
+        newDirection = gameState.direction === 'clockwise' ? 'counterclockwise' : 'clockwise';
+      }
+      
+      // Get players and next player (using the new direction if reversed)
       const playersResult = await db.query(
         `SELECT user_id FROM game_players WHERE game_id = $1 ORDER BY joined_at`,
         [gameId]
       );
       const playerIds = playersResult.rows.map(r => r.user_id);
-      let nextPlayer = getNextPlayer(playerIds, aiUserId, gameState.direction, cardToPlay);
-      
-      // Handle special cards
-      let newDirection = gameState.direction;
-      if (cardToPlay.value === 'reverse') {
-        newDirection = gameState.direction === 'clockwise' ? 'counterclockwise' : 'clockwise';
-      }
+      let nextPlayer = getNextPlayer(playerIds, aiUserId, newDirection, cardToPlay);
       
       // Handle Draw 2 and Wild Draw 4
       if (cardToPlay.value === 'draw2' || cardToPlay.value === 'wild_draw4') {
@@ -1227,6 +1508,7 @@ async function makeAIMove(gameId, aiUserId, io) {
           io.to(`game_${gameId}`).emit('player_skipped', {
             userId: nextPlayer,
             cardsDrawn: drawCount,
+            cardsLeft: nextHand.length,
             message: `Player drew ${drawCount} cards and was skipped`
           });
           
@@ -1254,6 +1536,12 @@ async function makeAIMove(gameId, aiUserId, io) {
           winnerName: aiName,
           message: 'Game Over!'
         });
+        
+        // Clear turn timer for finished game
+        clearTurnTimer(gameId);
+        
+        // Auto-delete the game after 30 seconds
+        deleteFinishedGame(gameId, 30000);
       } else {
         // Broadcast AI's move
         const cardAction = cardToPlay.value === 'draw2' ? 'Draw 2' : 
@@ -1268,6 +1556,10 @@ async function makeAIMove(gameId, aiUserId, io) {
           cardsLeft: hand.length,
           specialAction: cardAction
         });
+        
+        // Clear current turn timer and start new one for next player
+        clearTurnTimer(gameId);
+        startTurnTimer(gameId, nextPlayer, io);
         
         // Check if next player is also AI
         const nextPlayerResult = await db.query(
@@ -1333,6 +1625,15 @@ async function makeAIMove(gameId, aiUserId, io) {
         userId: aiUserId,
         cardsLeft: hand.length 
       });
+      
+      // Notify clients about turn change
+      io.to(`game_${gameId}`).emit('turn_changed', { 
+        currentPlayer: nextPlayer 
+      });
+      
+      // Clear current turn timer and start new one for next player
+      clearTurnTimer(gameId);
+      startTurnTimer(gameId, nextPlayer, io);
       
       // Check if next player is also AI
       const nextPlayerResult = await db.query(

@@ -63,20 +63,21 @@
             </strong>
           </p>
           
-          <!-- Debug info - VISIBLE FOR DEBUGGING -->
+          <!-- Debug info - COMMENTED OUT
           <div id="debugInfo" 
-               data-game-state="<%= game.state %>"
-               data-user-id="<%= user ? user.id : 'null' %>"
-               data-creator-id="<%= game.created_by %>"
-               data-is-creator="<%= user && user.id === game.created_by %>"
+               data-game-state=""
+               data-user-id=""
+               data-creator-id=""
+               data-is-creator=""
                style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-size: 12px; border-radius: 4px;">
             <strong>Debug Info:</strong><br>
-            Game State: <%= game.state %><br>
-            User ID: <%= user ? user.id : 'null' %><br>
-            Creator ID: <%= game.created_by %><br>
-            Is Creator: <%= user && user.id === game.created_by %><br>
-            Condition Met: <%= game.state === 'waiting' && user && user.id === game.created_by %>
+            Game State: <br>
+            User ID: <br>
+            Creator ID: <br>
+            Is Creator: <br>
+            Condition Met: 
           </div>
+          -->
           
           <% if (game.state === 'waiting' && user && user.id === game.created_by) { %>
             <button id="addAIBtn" class="btn btn-secondary" style="margin-top: 0.5rem; margin-right: 0.5rem;">
@@ -105,59 +106,116 @@
         </div>
       </div>
 
-      <div class="game-players">
-        <% game.players.forEach((player, index) => { %>
-          <div class="player-card <%= player.username === game.current_player ? 'active' : '' %>" data-player-id="<%= player.id %>">
-            <div class="player-name">
-              <% if (player.username.startsWith('AI_Player_')) { %>
-                <span style="font-size: 1.2rem;">🤖</span>
-              <% } else if (player.username.startsWith('guest_')) { %>
-                <span style="font-size: 1.2rem;">👤</span>
-              <% } %>
-              <%= player.username %>
-            </div>
-            <div class="player-cards"><%= player.cardCount %> cards</div>
-          </div>
-        <% }); %>
-      </div>
-
       <% if (game.state === 'active' && game.gameState) { %>
-        <div class="game-center">
-          <div class="discard-pile">
-            <% if (game.gameState.discard_pile && game.gameState.discard_pile.length > 0) { %>
-              <% const topCard = game.gameState.discard_pile[game.gameState.discard_pile.length - 1]; %>
-              <div class="uno-card card-<%= topCard.color %>" style="width:100px; height:140px;">
-                <div class="uno-value" style="font-size:1.5rem;"><%= getCardSymbol(topCard.value) %></div>
-              </div>
-            <% } else { %>
-              <div style="text-align: center;">
-                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🃏</div>
-                <div style="font-size: 0.75rem;">DISCARD</div>
-              </div>
-            <% } %>
-          </div>
+        <!-- Compact 3-Column Layout -->
+        <div style="display: grid; grid-template-columns: 180px 1fr 180px; gap: 1rem; margin: 1rem 0;">
           
-          <div class="draw-pile" id="drawCardBtn">
-            <div style="text-align: center;">
-              <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎴</div>
-              <div style="font-size: 0.75rem;">DRAW</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="player-hand">
-          <h3 class="hand-title">Your Hand (<span id="cardCount"><%= hand.length %></span> cards)</h3>
-          <div class="hand-cards">
-            <% if (hand && hand.length > 0) { %>
-              <% hand.forEach(function(card, index){ %>
-                <div class="uno-card card-<%= card.color %>" data-card-index="<%= index %>">
-                  <div class="uno-value"><%= getCardSymbol(card.value) %></div>
+          <!-- Left: Players List -->
+          <div>
+            <h3 style="font-size: 0.875rem; margin-bottom: 0.5rem; color: #4b5563; font-weight: 600;">👥 Players</h3>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <% game.players.forEach((player) => { %>
+                <div class="player-card <%= player.username === game.current_player ? 'active' : '' %>" 
+                     data-player-id="<%= player.id %>"
+                     style="padding: 0.5rem; margin: 0;">
+                  <div class="player-name" style="font-size: 0.8rem;">
+                    <% if (player.username.startsWith('AI_Player_')) { %>
+                      <span>🤖</span>
+                    <% } else if (player.username.startsWith('guest_')) { %>
+                      <span>👤</span>
+                    <% } %>
+                    <%= player.username %>
+                  </div>
+                  <div class="player-cards" style="font-size: 0.7rem;"><%= player.cardCount %> cards</div>
                 </div>
               <% }); %>
-            <% } else { %>
-              <p style="color:#6b7280;">No cards in hand.</p>
-            <% } %>
+            </div>
           </div>
+
+          <!-- Center: Game Board -->
+          <div>
+            <!-- Timer -->
+            <div id="turnTimerDisplay" style="margin-bottom: 0.75rem; display: none;">
+              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.6rem 1rem; border-radius: 8px; text-align: center;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                  <span style="font-size: 1.1rem;">⏱️</span>
+                  <span style="font-size: 0.95rem; font-weight: 700;">Time: <span id="turnTimerSeconds">10</span>s</span>
+                </div>
+                <div style="background: rgba(255,255,255,0.25); height: 5px; border-radius: 3px; overflow: hidden;">
+                  <div id="turnTimerBar" style="height: 100%; background: linear-gradient(90deg, #10b981, #fbbf24, #ef4444); width: 100%; transition: width 0.1s linear;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Discard & Draw -->
+            <div class="game-center" style="margin-bottom: 0.75rem;">
+              <div class="discard-pile">
+                <% if (game.gameState.discard_pile && game.gameState.discard_pile.length > 0) { %>
+                  <% const topCard = game.gameState.discard_pile[game.gameState.discard_pile.length - 1]; %>
+                  <div class="uno-card card-<%= topCard.color %>" style="width:90px; height:126px;">
+                    <div class="uno-value" style="font-size:1.3rem;"><%= getCardSymbol(topCard.value) %></div>
+                  </div>
+                <% } else { %>
+                  <div style="text-align: center;">
+                    <div style="font-size: 1.8rem; margin-bottom: 0.3rem;">🃏</div>
+                    <div style="font-size: 0.7rem;">DISCARD</div>
+                  </div>
+                <% } %>
+              </div>
+              <div class="draw-pile" id="drawCardBtn">
+                <div style="text-align: center;">
+                  <div style="font-size: 1.8rem; margin-bottom: 0.3rem;">🎴</div>
+                  <div style="font-size: 0.7rem;">DRAW</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Your Hand -->
+            <div class="player-hand" style="margin: 0;">
+              <h3 class="hand-title" style="font-size: 0.9rem; margin-bottom: 0.5rem;">Your Hand (<span id="cardCount"><%= hand.length %></span> cards)</h3>
+              <div class="hand-cards" style="justify-content: center; gap: 0.5rem;">
+                <% if (hand && hand.length > 0) { %>
+                  <% hand.forEach(function(card, index){ %>
+                    <div class="uno-card card-<%= card.color %>" data-card-index="<%= index %>" style="width: 65px; height: 91px;">
+                      <div class="uno-value" style="font-size: 1.1rem;"><%= getCardSymbol(card.value) %></div>
+                    </div>
+                  <% }); %>
+                <% } else { %>
+                  <p style="color:#6b7280; font-size: 0.85rem;">No cards</p>
+                <% } %>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Game Info -->
+          <div>
+            <div style="background: #f9fafb; padding: 0.75rem; border-radius: 8px; border: 1px solid #e5e7eb;">
+              <h3 style="font-size: 0.875rem; margin-bottom: 0.5rem; color: #1f2937; font-weight: 600;">📋 Info</h3>
+              <div style="font-size: 0.75rem; color: #4b5563; line-height: 1.6;">
+                <div style="margin-bottom: 0.5rem;">
+                  <strong>Current:</strong><br>
+                  <% if (game.current_player.startsWith('AI_Player_')) { %>
+                    🤖
+                  <% } else if (game.current_player.startsWith('guest_')) { %>
+                    👤
+                  <% } %>
+                  <%= game.current_player %>
+                </div>
+                <div style="margin-bottom: 0.5rem;">
+                  <strong>Direction:</strong><br>
+                  <% if (game.direction === 'clockwise') { %>
+                    🔄 Clockwise
+                  <% } else { %>
+                    ↩️ Counter-CW
+                  <% } %>
+                </div>
+                <div>
+                  <strong>Players:</strong> <%= game.players.length %>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       <% } else if (game.state === 'waiting') { %>
         <div style="text-align: center; padding: 3rem; background: #f9fafb; border-radius: 0.75rem; margin: 2rem 0;">
@@ -248,6 +306,7 @@
   <div id="gameData" 
        data-game-id="<%= game.id %>" 
        data-user-id="<%= user.id %>" 
+       data-game-state="<%= game.state %>"
        data-current-player-id="<%= game.current_player_id || '' %>"
        data-hand='<%- JSON.stringify(hand) %>' 
        style="display:none;">
