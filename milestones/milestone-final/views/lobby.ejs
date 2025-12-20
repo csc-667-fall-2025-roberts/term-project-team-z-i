@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lobby - Uno Game</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <div class="logo">🎮 Uno Game</div>
+        <div class="user-info">
+          <% if (user && !user.isGuest) { %>
+            <span>Welcome, <strong><%= user.username %></strong></span>
+            <a href="/auth/logout" class="btn btn-danger">Logout</a>
+          <% } else { %>
+            <span style="color: #6b7280;">Playing as Guest</span>
+            <a href="/auth/login" class="btn btn-secondary">Login</a>
+            <a href="/auth/signup" class="btn btn-primary">Sign Up</a>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <h2 class="card-header">🎮 Create New Game</h2>
+      <form action="/games/create" method="POST">
+        <div class="form-group">
+          <label for="gameName" class="form-label">Game Name</label>
+          <input 
+            type="text" 
+            id="gameName" 
+            name="gameName" 
+            class="form-input" 
+            placeholder="Enter game name"
+            required
+            maxlength="100"
+          >
+        </div>
+        
+        <div class="form-group">
+          <label for="maxPlayers" class="form-label">Max Players</label>
+          <select id="maxPlayers" name="maxPlayers" class="form-select">
+            <option value="2">2 Players</option>
+            <option value="3">3 Players</option>
+            <option value="4" selected>4 Players</option>
+            <option value="5">5 Players</option>
+            <option value="6">6 Players</option>
+            <option value="8">8 Players</option>
+            <option value="10">10 Players</option>
+          </select>
+        </div>
+        
+        <div style="background: #f3f4f6; padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+          <p style="font-size: 0.875rem; color: #4b5563; margin: 0;">
+            💡 <strong>Tip:</strong> Playing alone? You can add AI opponents after creating a game!
+          </p>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Create Game</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 class="card-header">🎯 Available Games</h2>
+      <div class="game-list">
+        <% if (games && games.length > 0) { %>
+          <% games.forEach(game => { %>
+            <div class="game-item">
+              <div class="game-info">
+                <h3><%= game.name %></h3>
+                <div class="game-meta">
+                  Created by: <%= game.created_by %> | 
+                  Players: <%= game.current_players %>/<%= game.max_players %>
+                  <span class="game-status status-<%= game.state.replace('_', '-') %>">
+                    <%= game.state.replace('_', ' ') %>
+                  </span>
+                </div>
+              </div>
+              <% if (game.current_players < game.max_players && game.state !== 'finished') { %>
+                <a href="/games/<%= game.id %>" class="btn btn-primary">Join Game</a>
+              <% } else if (game.state === 'finished') { %>
+                <span class="btn btn-secondary" style="opacity: 0.6; cursor: not-allowed;">Finished</span>
+              <% } else { %>
+                <span class="btn btn-secondary" style="opacity: 0.6; cursor: not-allowed;">Full</span>
+              <% } %>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <p style="text-align: center; color: #6b7280; padding: 2rem;">
+            No games available. Create one to get started! 🚀
+          </p>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="chat-area">
+      <h3 class="card-header">💬 Lobby Chat</h3>
+      <div class="chat-messages" id="chatMessages">
+        <% if (messages && messages.length > 0) { %>
+          <% messages.forEach(function(msg) { %>
+            <div class="chat-message">
+              <strong><%= msg.username %></strong>
+              <span style="color:#6b7280; font-size:0.85rem; margin-left:0.5rem;"><%= msg.created_at %></span>
+              <div><%= msg.message %></div>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <div class="chat-message">
+            <strong style="color: #667eea;">System</strong>
+            <div>Welcome to the lobby! Say hello! 👋</div>
+          </div>
+        <% } %>
+      </div>
+
+      <% if (user) { %>
+        <form action="/messages" method="POST" class="chat-input-group">
+          <input 
+            type="text" 
+            name="message" 
+            class="chat-input" 
+            placeholder="Type a message..."
+            required
+            maxlength="500"
+          >
+          <button type="submit" class="btn btn-primary">Send</button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+
+  <script>
+    // Auto-scroll chat to bottom
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  </script>
+</body>
+</html>

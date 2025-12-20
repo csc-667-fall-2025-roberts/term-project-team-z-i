@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error - Uno Game</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <div class="logo">🎮 Uno Game</div>
+        <div class="user-info">
+          <a href="/lobby" class="btn btn-primary">Go to Lobby</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="error-container">
+    <div class="error-code">⚠️</div>
+    <h1 class="error-message">Oops! Something went wrong</h1>
+    <p style="color: #6b7280; margin-bottom: 2rem; font-size: 1.125rem;">
+      <%= error || 'An unexpected error occurred' %>
+    </p>
+    <a href="/lobby" class="btn btn-primary" style="margin-right: 1rem;">Return to Lobby</a>
+    <a href="/" class="btn btn-secondary">Go Home</a>
+  </div>
+</body>
+</html>

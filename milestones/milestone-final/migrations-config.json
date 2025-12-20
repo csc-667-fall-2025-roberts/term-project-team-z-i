@@ -1,0 +1,7 @@
+{
+  "migrations-table": "pgmigrations",
+  "dir": "migrations",
+  "check-order": true,
+  "migration-file-language": "js",
+  "ignore-pattern": "\\..*"
+}
