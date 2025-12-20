@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= game.name %> - Uno Game</title>
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/cards.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -176,7 +177,7 @@
               <div class="hand-cards" style="justify-content: center; gap: 0.5rem;">
                 <% if (hand && hand.length > 0) { %>
                   <% hand.forEach(function(card, index){ %>
-                    <div class="uno-card card-<%= card.color %>" data-card-index="<%= index %>" style="width: 65px; height: 91px;">
+                    <div class="uno-card card-<%= card.color %>-<%= card.value %>" data-card-index="<%= index %>" style="width: 65px; height: 91px;">
                       <div class="uno-value" style="font-size: 1.1rem;"><%= getCardSymbol(card.value) %></div>
                     </div>
                   <% }); %>
